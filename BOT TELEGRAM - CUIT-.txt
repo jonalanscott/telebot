@@ -1,0 +1,80 @@
+import telebot
+import threading
+import pandas as pd
+import requests
+import numpy as np
+import json
+
+
+
+TOKEN = "Aca va el Token del bot"
+bot = telebot.TeleBot(TOKEN)
+
+
+@bot.message_handler(commands=['start'])
+
+
+
+def cmd_botones(message):
+    bot.send_message(
+        message.chat.id, f'cual es el CUIT que quieres buscar (sin guiones) ?')
+
+@bot.message_handler(func=lambda message: True)
+def cual_cuit(message):
+    cuit = message.text
+
+    tangoApi = "https://afip.tangofactura.com/Rest/GetContribuyenteFull"
+    param = dict(cuit=f'{cuit}')
+    resp = requests.get(url=tangoApi, params=param, timeout=10)
+    data = resp.json()
+
+    nombre = data['Contribuyente']['nombre']
+    
+    impuestos = data['Contribuyente']['ListaImpuestos']
+    impuestos = [item['descImpuesto'] for item in impuestos]
+    impuestos = ', '.join(impuestos)
+    
+    
+    try:
+        categmono = data['Contribuyente']['categoriasMonotributo']
+        categmono = [item['descCatMonotributo'] for item in categmono]
+        categmono = ', '.join(categmono)
+
+    except:
+        pass
+    
+    domicilio = data['Contribuyente']['domicilioFiscal']['direccion']
+    codpostal = data['Contribuyente']['domicilioFiscal']['codPostal']
+    jurisdiccion = data['Contribuyente']['domicilioFiscal']['nombreProvincia']
+
+    actividades = data['Contribuyente']['ListaActividades']
+    actividades = [item['descActividad'] for item in actividades]
+    actividades = ', '.join(actividades)
+
+
+    texto = f'Razon Social: {nombre}' + '\n' + '\n'
+    texto += f'Impuestos: {impuestos}' + '\n' + '\n'
+    try:
+        texto += f'Categoria Monotributo: {categmono}' + '\n'+ '\n'
+    except:
+        pass
+    texto += f'Domicilio Fiscal: {domicilio}' + '\n' + '\n'
+    texto += f'Codigo Postal: {codpostal}' + '\n'+ '\n'
+    texto += f'Jurisdiccion: {jurisdiccion}' + '\n' + '\n'
+    texto += f'Actividades: {actividades}'
+
+    bot.send_message(message.chat.id,texto)
+
+  
+def recibir_mensajes():
+    """Bucle infinito que comprueba si hay nuevos mensajes"""
+    bot.infinity_polling()
+
+
+if __name__ == '__main__':
+    print('Iniciando el bot')
+    
+
+    hilo_bot = threading.Thread(name='hilo_bot', target=recibir_mensajes)
+    hilo_bot.start()
+
